@@ -24,13 +24,27 @@ macOS 原生的酷狗音乐客户端，用 SwiftUI 写的个人学习项目。
 
 ## 安装
 
-### 预编译版本（推荐）
+### 预编译版本
+
+两种方式任选其一。**不需要安装 Node** —— API 服务已随 App 打包，启动时自动拉起、退出时自动回收。
+
+#### 方式一：Homebrew
+
+```bash
+brew trust dabrlin/astramusic
+brew install --cask dabrlin/astramusic/astramusic
+```
+
+Homebrew 6 起，第三方 tap 需要先 `brew trust` 才会加载其中的 cask——这一步不能省。
+升级用 `brew upgrade --cask astramusic`；卸载用 `brew uninstall --cask astramusic`（加 `--zap` 会连本地数据一起删掉）。
+
+#### 方式二：直接下载 DMG
 
 从 [Releases](https://github.com/DabRlin/AstraMusic/releases) 下载 `AstraMusic-v<版本>.dmg`，打开后把 App 拖进「应用程序」。
 
-**不需要安装 Node** —— API 服务已随 App 打包，启动时自动拉起、退出时自动回收。
+#### 首次打开需要右键（两种方式都一样）
 
-> ⚠️ **首次打开需要右键**：本项目没有 Apple 公证（没有付费开发者账号），直接双击会被系统拦下。请**右键点 App → 打开**，在弹窗里再点一次「打开」；此后双击即可正常使用。
+> ⚠️ 本项目没有 Apple 公证（没有付费开发者账号），直接双击会被系统拦下。请**右键点 App → 打开**，在弹窗里再点一次「打开」；此后双击即可正常使用。**Homebrew 也不会跳过这一步。**
 >
 > 若仍被拦截，可清除隔离标记：`xattr -dr com.apple.quarantine /Applications/AstraMusic.app`
 
