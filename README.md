@@ -24,7 +24,15 @@ macOS 原生的酷狗音乐客户端，用 SwiftUI 写的个人学习项目。
 
 ## 安装
 
-> 预编译的 DMG / Homebrew 版本**尚未发布**。目前请从源码构建。
+### 预编译版本（推荐）
+
+从 [Releases](https://github.com/DabRlin/AstraMusic/releases) 下载 `AstraMusic-v<版本>.dmg`，打开后把 App 拖进「应用程序」。
+
+**不需要安装 Node** —— API 服务已随 App 打包，启动时自动拉起、退出时自动回收。
+
+> ⚠️ **首次打开需要右键**：本项目没有 Apple 公证（没有付费开发者账号），直接双击会被系统拦下。请**右键点 App → 打开**，在弹窗里再点一次「打开」；此后双击即可正常使用。
+>
+> 若仍被拦截，可清除隔离标记：`xattr -dr com.apple.quarantine /Applications/AstraMusic.app`
 
 ### 从源码构建
 
@@ -42,15 +50,15 @@ xcodebuild -project AstraMusic.xcodeproj -scheme AstraMusic -configuration Debug
 
 也可以直接用 Xcode 打开 `AstraMusic.xcodeproj` 后按 ⌘R。
 
-### 启动本地 API 服务
+#### 启动本地 API 服务
 
-登录、搜索、播放都依赖它，**不启动就没有任何内容**：
+从源码运行（Xcode / 上面的命令）时 bundle 里没有内置服务，需要自己起一个 —— 登录、搜索、播放都依赖它，**不启动就没有任何内容**：
 
 ```bash
 cd Sidecar && node app.js --platform=lite --port=6521
 ```
 
-App 默认连接 `http://127.0.0.1:6521`。
+App 默认连接 `http://127.0.0.1:6521`，并且会**复用**已经在该端口上的服务（所以开发时手动起的那个和打包版内置的那个可以互换）。
 
 ### 使用
 
@@ -58,7 +66,7 @@ App 默认连接 `http://127.0.0.1:6521`。
 
 ## 已知限制
 
-- 从源码运行需要你自己启动本地 API 服务（打包版会自带并自动启动，但尚未发布）。
+- 从源码运行需要你自己启动本地 API 服务；预编译版本自带并自动启动。
 - 依赖第三方非官方接口，随时可能失效。
 - 预编译版本只支持 Apple Silicon。
 
@@ -89,3 +97,6 @@ It hosts, stores, and redistributes **no** audio content, and it implements **no
 本项目以 **Apache License 2.0** 发布，见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
 
 `Sidecar/` 是第三方开源项目 [KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi) 的快照（MIT License），见 `Sidecar/LICENSE`。
+
+
+问一下我们产生的内容和该做的清理，然后问一下生命周期和管控
