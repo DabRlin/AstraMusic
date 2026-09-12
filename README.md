@@ -20,7 +20,7 @@ macOS 原生的酷狗音乐客户端，用 SwiftUI 写的个人学习项目。
 |---|---|
 | 系统 | macOS 15.5 或更高 |
 | 预编译版本 | Apple Silicon（arm64） |
-| 从源码构建 | Xcode 16 + Node.js 18 或更高 |
+| 从源码构建 | Xcode 16 + Node.js 18 或更高 + pnpm |
 
 ## 安装
 
@@ -32,8 +32,8 @@ macOS 原生的酷狗音乐客户端，用 SwiftUI 写的个人学习项目。
 git clone https://github.com/DabRlin/AstraMusic.git
 cd AstraMusic
 
-# 1) 准备本地 API 服务（首次需要）
-cd Sidecar && npm ci && cd ..
+# 1) 准备本地 API 服务（首次需要；需要 pnpm，如 npm i -g pnpm@9）
+cd Sidecar && pnpm install --frozen-lockfile && cd ..
 
 # 2) 编译 app
 xcodebuild -project AstraMusic.xcodeproj -scheme AstraMusic -configuration Debug \
@@ -58,7 +58,7 @@ App 默认连接 `http://127.0.0.1:6521`。
 
 ## 已知限制
 
-- 必须自行启动本地 API 服务，App 不含内置服务。
+- 从源码运行需要你自己启动本地 API 服务（打包版会自带并自动启动，但尚未发布）。
 - 依赖第三方非官方接口，随时可能失效。
 - 预编译版本只支持 Apple Silicon。
 
