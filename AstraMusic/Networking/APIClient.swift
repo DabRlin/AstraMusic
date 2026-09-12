@@ -138,14 +138,20 @@ actor APIClient {
 /// `JSONSerialization` and offers forgiving, typed accessors; every accessor
 /// returns `nil`/empty instead of throwing, so parsing code reads as a series of
 /// fallbacks. Only the small number of shapes the app really needs are modelled.
-struct AnyJSON: Sendable {
+///
+/// `@unchecked` because `object` is `Any`. It only ever holds `JSONSerialization`
+/// output (`NSDictionary` / `NSArray` / `NSString` / `NSNumber` / `NSNull`), which
+/// is immutable once parsed, and this type neither mutates it nor hands it out for
+/// mutation — so crossing the `APIClient` actor boundary is safe. Keeping
+/// `init(_:)` private is what makes that a guarantee instead of an intention.
+struct AnyJSON: @unchecked Sendable {
     private let object: Any
 
     init(data: Data) throws {
         object = try JSONSerialization.jsonObject(with: data)
     }
 
-    init(_ object: Any) {
+    private init(_ object: Any) {
         self.object = object
     }
 
