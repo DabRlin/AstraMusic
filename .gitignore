@@ -1,0 +1,25 @@
+# ---- macOS ----
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ---- Xcode ----
+xcuserdata/
+*.xcuserstate
+/.derived-data/
+/.module-cache/
+build/
+DerivedData/
+
+# ---- Sidecar (Node / pkg) ----
+/Sidecar/node_modules/
+/Sidecar/bin/
+.env
+
+# ---- 暂不上传（整理后再决定）----
+/Docs/
+/AGENTS.md
+/CLAUDE.md
+
+# ---- 设计草稿 ----
+/Tools/IconPreviews/

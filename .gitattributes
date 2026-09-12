@@ -1,0 +1,5 @@
+# 仓库内统一 LF，跨平台一致（不依赖各机器的 core.autocrlf）
+* text=auto
+
+# Vendored sidecar：保持上游原始字节，不做换行转换
+Sidecar/** -text

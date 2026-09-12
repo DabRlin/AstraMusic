@@ -1,0 +1,12 @@
+AstraMusic
+Copyright 2026 DabRlin
+
+This product includes third-party software, listed below.
+
+--------------------------------------------------------------------------------
+KuGouMusicApi — https://github.com/MakcRe/KuGouMusicApi
+  Bundled at  : Sidecar/
+  Version     : 1.6.2
+  License     : MIT
+  Copyright   : (c) 2023 MakcRe
+  License text: see Sidecar/LICENSE

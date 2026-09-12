@@ -1,0 +1,16 @@
+KuGouMusicApi (vendored)
+=======================
+
+This directory is a vendored snapshot of the KuGouMusicApi project,
+used by AstraMusic as the local API sidecar.
+
+    Upstream : https://github.com/MakcRe/KuGouMusicApi
+    Version  : 1.6.2
+    License  : MIT (see LICENSE in this directory)
+    Copyright: (c) 2023 MakcRe
+
+No source files were modified. When vendoring, the upstream `.git` and
+`.github` directories were removed; everything else is upstream as-is.
+
+AstraMusic talks to this sidecar over HTTP (default http://127.0.0.1:6521)
+and does not link against or embed its code.
