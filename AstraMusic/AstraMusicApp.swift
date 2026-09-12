@@ -12,13 +12,30 @@ import SwiftUI
 /// - `player.onSongStarted` — records a play into the library. This is the only
 ///   source of "Recent"; there is no `/user/listen` call.
 ///
+/// `sidecar` also lives here: it starts the bundled API process before anything
+/// talks to the network (see `SidecarController`).
+///
 /// Ordering matters: the wiring runs in `onAppear`, before `bootstrap()` on the
 /// `task`, so nothing hits the network with a half-configured graph.
+///
+/// The stores are built in `init` rather than as property initializers so
+/// `SandboxMigration` can run first — they read `UserDefaults` (device, session,
+/// playback mode) as they are constructed, and that state may still be inside the
+/// old sandbox container.
 @main
 struct AstraMusicApp: App {
-    @State private var player = PlayerStore()
-    @State private var library = LibraryStore()
-    @State private var auth = AuthStore()
+    @State private var sidecar: SidecarController
+    @State private var player: PlayerStore
+    @State private var library: LibraryStore
+    @State private var auth: AuthStore
+
+    init() {
+        SandboxMigration.migratePreferencesIfNeeded()
+        _sidecar = State(initialValue: SidecarController())
+        _player = State(initialValue: PlayerStore())
+        _library = State(initialValue: LibraryStore())
+        _auth = State(initialValue: AuthStore())
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -38,6 +55,10 @@ struct AstraMusicApp: App {
                     }
                 }
                 .task {
+                    // The sidecar has to be up before `bootstrap()` registers the
+                    // device — there is no retry, a failure simply becomes the
+                    // "service is unavailable" copy.
+                    await sidecar.start()
                     await auth.bootstrap()
                 }
         }

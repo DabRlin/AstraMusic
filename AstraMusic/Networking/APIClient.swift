@@ -53,11 +53,9 @@ actor APIClient {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            // Any transport failure means "sidecar not reachable" from the user's
-            // point of view, so it becomes one actionable message.
-            throw APIError.unreachable(
-                "Cannot reach \(baseURL.host ?? "API") at port \(baseURL.port.map(String.init) ?? "?"). Start the local API sidecar."
-            )
+            // Any transport failure is "the local service is not answering" from
+            // the user's point of view, so it becomes one actionable message.
+            throw APIError.unreachable(SidecarController.unavailableMessage)
         }
 
         // Kugou reports failures inside the body with HTTP 200 surprisingly often,

@@ -133,7 +133,7 @@ struct ContentView: View {
             } label: {
                 Label("Sign In", systemImage: "person.crop.circle")
             }
-            .help(auth.apiReachable ? "Sign in with Kugou" : "Start the local API sidecar first")
+            .help(auth.apiReachable ? "Sign in with Kugou" : SidecarController.unavailableMessage)
         }
     }
 

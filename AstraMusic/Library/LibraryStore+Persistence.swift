@@ -42,6 +42,11 @@ extension LibraryStore {
         let folder = fileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
+        // First un-sandboxed launch: the library may still be in the old sandbox
+        // container. Must happen before the existence check below, otherwise a
+        // missing file would seed an empty library and overwrite the recovery.
+        SandboxMigration.copyLegacyFileIfNeeded(to: fileURL, named: "library.json")
+
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             seed()
             save()
@@ -177,8 +182,10 @@ extension LibraryStore {
         }
     }
 
-    /// `~/Library/Application Support/AstraMusic/library.json` (or the sandboxed
-    /// container equivalent, when the app is sandboxed).
+    /// `~/Library/Application Support/AstraMusic/library.json`.
+    ///
+    /// `SandboxMigration` recovers a file left behind in the old sandbox
+    /// container, so dropping the sandbox does not wipe the library.
     static func defaultFileURL() -> URL {
         let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory

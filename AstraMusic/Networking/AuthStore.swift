@@ -14,8 +14,8 @@ final class AuthStore {
     var device: DeviceInfo?
     /// Last failure, already phrased for display.
     var lastError: String?
-    /// Whether the local sidecar answered. Drives the "start the local API
-    /// sidecar" messaging instead of showing an empty screen with no explanation.
+    /// Whether the local sidecar answered. Drives the "service unavailable"
+    /// messaging instead of showing an empty screen with no explanation.
     var apiReachable = false
 
     /// The account client. Typed as the composition of the metadata surface

@@ -52,15 +52,15 @@ struct SearchView: View {
                     }
 
                     // Distinguishes "nothing searched yet" from "searched, no
-                    // results" (which is a `message`). The hint names the sidecar
-                    // because search fails visibly when the local API is down.
+                    // results" (which is a `message`). Search fails visibly when
+                    // the local service is down, so the empty hint says so.
                     if results.isEmpty, message == nil, !isSearching {
                         ContentUnavailableView(
                             "Search Kugou",
                             systemImage: "magnifyingglass",
                             description: Text(auth.apiReachable
                                 ? "Type a title or artist, then press Return."
-                                : "Start the local API sidecar first.")
+                                : SidecarController.unavailableMessage)
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
