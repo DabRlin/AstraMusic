@@ -14,6 +14,13 @@ macOS 原生的酷狗音乐客户端，用 SwiftUI 写的个人学习项目。
 - **账号** — 扫码 / 手机验证码 / 密码登录；云端点赞、加歌单、关注、收藏
 - **界面** — 深色 / 浅色自适应，Now Playing 常驻底栏，封面 / 歌词可全屏
 
+## 截图
+
+| | |
+|---|---|
+| ![AstraMusic 界面](Photos/1.jpg) | ![AstraMusic 界面](Photos/2.jpg) |
+| ![AstraMusic 界面](Photos/3.jpg) | ![AstraMusic 界面](Photos/4.jpg) |
+
 ## 系统要求
 
 | | |
@@ -78,6 +85,27 @@ App 默认连接 `http://127.0.0.1:6521`，并且会**复用**已经在该端口
 
 需要登录酷狗账号（默认扫码，也支持手机验证码 / 密码）。本项目**没有游客模式**，未登录时所有页面都是登录入口。
 
+## 卸载
+
+### Homebrew 安装的
+
+```bash
+brew uninstall --cask astramusic
+```
+
+加 `--zap` 会连资料库、偏好等本地数据一起删除。
+
+### 其他情况，或想清得彻底
+
+仓库里的 [`Script/Uninstall.sh`](Script/Uninstall.sh) 会把 AstraMusic 从这台 Mac 上彻底清掉 —— 应用本体、资料库、偏好、缓存、旧版本遗留的沙盒容器，以及钥匙串里的酷狗登录令牌，做到「像从没装过一样」。
+
+```bash
+git clone --depth 1 https://github.com/DabRlin/AstraMusic.git
+./AstraMusic/Script/Uninstall.sh
+```
+
+脚本会先列出将删除的内容，确认后才执行；加 `--dry-run` 只预览不删。不需要 sudo。
+
 ## 已知限制
 
 - 从源码运行需要你自己启动本地 API 服务；预编译版本自带并自动启动。
@@ -106,11 +134,16 @@ It hosts, stores, and redistributes **no** audio content, and it implements **no
 
 **If you are a rights holder and believe this project infringes your rights, please open an issue in this repository — we will remove the offending content or take the project down promptly.**
 
+## 致谢
+
+- **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)** —— 本地 API 服务的基础，`Sidecar/` 是它的快照（MIT License，见 `Sidecar/LICENSE`）。没有它就没有这个客户端。
+- **[DeepSeek](https://www.deepseek.com/)** —— 模型驱动的编码助手，承担了绝大部分代码编写、重构、调试与文档工作。
+- **[Zed](https://zed.dev/)** —— 高性能的协作式编辑器，本项目的主要开发环境。
+
+感谢这些项目，让这个学习项目得以完成。
+
 ## 许可
 
 本项目以 **Apache License 2.0** 发布，见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
 
 `Sidecar/` 是第三方开源项目 [KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi) 的快照（MIT License），见 `Sidecar/LICENSE`。
-
-
-问一下我们产生的内容和该做的清理，然后问一下生命周期和管控
