@@ -1,0 +1,15 @@
+# The actions in .github/workflows/release.yml are pinned to commit SHAs instead
+# of tags: a tag can be moved, and that workflow holds `contents: write`. Pinning
+# means nothing updates them implicitly, so this is what keeps them from going
+# stale.
+#
+# Only `github-actions` is listed, deliberately. `Sidecar/` is a vendored snapshot
+# of an upstream release; letting Dependabot bump its dependencies here would edit
+# files that are supposed to stay identical to the snapshot they were taken from,
+# and `Sidecar/NOTICE` says so.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
