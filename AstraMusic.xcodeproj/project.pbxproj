@@ -10,9 +10,22 @@
 		34B2440E304C267A0088AD76 /* AstraMusic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AstraMusic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		34B24421304C267A0088AD76 /* Exceptions for "AstraMusic" folder in "AstraMusic" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 34B2440D304C267A0088AD76 /* AstraMusic */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		34B24410304C267A0088AD76 /* AstraMusic */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				34B24421304C267A0088AD76 /* Exceptions for "AstraMusic" folder in "AstraMusic" target */,
+			);
 			path = AstraMusic;
 			sourceTree = "<group>";
 		};
