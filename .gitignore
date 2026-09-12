@@ -11,9 +11,14 @@ xcuserdata/
 build/
 DerivedData/
 
+# ---- 打包产物 ----
+/dist/
+
 # ---- Sidecar (Node / pkg) ----
 /Sidecar/node_modules/
 /Sidecar/bin/
+# pnpm 在本机把内容寻址 store 落在仓库内（未锚定：根目录或 Sidecar/ 下都可能出现）
+.pnpm-store/
 .env
 
 # ---- 暂不上传（整理后再决定）----

@@ -1,0 +1,117 @@
+name: Release
+
+# Packaging is only wired to tags and manual runs — pull requests do not need a
+# 47MB sidecar build. `Docs/packaging-plan.md` §9 covers the design.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Needed for `gh release create` to attach the DMG.
+permissions:
+  contents: write
+
+# The first launch instructions and the checksum that a Homebrew cask needs live
+# in the release body, so they are generated here rather than copied by hand.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    # arm64 GitHub runner, which also carries Xcode 16 by default — the project
+    # targets macOS 15.5. An x64 runner would still work: package.sh pins
+    # ARCHS=arm64 and pkg downloads an arm64 Node base binary rather than
+    # compiling one.
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        # No `submodules:` on purpose — the sidecar is vendored into Sidecar/ so a
+        # plain checkout is already complete.
+
+      # pnpm must exist before setup-node, which uses it for the store cache.
+      # The vendored sidecar is a pnpm project (only pnpm-lock.yaml), so `npm ci`
+      # is not an option.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: Sidecar/pnpm-lock.yaml
+
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          node --version
+          pnpm --version
+
+      # Builds the sidecar, smoke tests it, builds and signs the app, and writes
+      # dist/AstraMusic-v<version>.dmg. Everything it needs is in the repo.
+      - name: Package
+        run: ./Tools/package.sh
+
+      # Guards against tagging v1.1 while MARKETING_VERSION still says 1.0, which
+      # would publish a DMG whose name lies about its contents (and would break a
+      # cask pointing at it).
+      - name: Verify the tag matches the built version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          dmg="$(basename "$(ls dist/*.dmg)")"
+          if [[ "$dmg" != "AstraMusic-$GITHUB_REF_NAME.dmg" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match built $dmg — bump MARKETING_VERSION and CURRENT_PROJECT_VERSION first"
+            exit 1
+          fi
+
+      - name: Checksum
+        id: checksum
+        run: echo "sha256=$(shasum -a 256 dist/*.dmg | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AstraMusic-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA256: ${{ steps.checksum.outputs.sha256 }}
+        run: |
+          cat > "$RUNNER_TEMP/notes.md" <<'EOF'
+          Unofficial, open-source macOS client for Kugou Music. arm64, macOS 15.5+.
+
+          ### First launch
+          This build is not notarized (no paid Apple Developer account), so macOS
+          blocks a plain double-click. **Right-click the app → Open**, then confirm
+          once in the dialog. After that it opens normally.
+
+          If it is still refused, clear the quarantine flag:
+
+          ```
+          xattr -dr com.apple.quarantine /Applications/AstraMusic.app
+          ```
+
+          Homebrew does not skip this either — a cask install still needs the same
+          right-click on first launch.
+
+          ### Notes
+          - Playback requires signing in with a Kugou account; there is no guest mode.
+          - Unofficial API. For personal learning only. Please respect copyright and
+            support the official apps.
+
+          ### Checksum
+          ```
+          SHA256 (AstraMusic.dmg) = __SHA256__
+          ```
+          EOF
+          # Fill the checksum in after the heredoc so the notes never ship a placeholder.
+          sed -i '' "s/__SHA256__/$SHA256/" "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md"
