@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 
 /// Name of the executable `Tools/package.sh` copies into `Contents/MacOS`.
@@ -11,21 +12,33 @@ private let maximumRelaunches = 3
 /// reclaims it on quit.
 ///
 /// **Fixed port.** The app always talks to `APIConfiguration.baseURL`
-/// (`http://127.0.0.1:6521`). Before launching anything, `start()` checks whether
-/// the port already answers and adopts it if so — that is what makes the manual
-/// dev flow (`node app.js --port=6521`) and a sidecar leaked by a hard-killed
-/// previous launch both work, with no pid bookkeeping and no dynamic port to
-/// inject before the stores are built.
+/// (`http://127.0.0.1:6521`). `start()` first looks at whether the port already
+/// answers, which is what makes a developer's hand-started `node app.js` usable
+/// without a dynamic port to inject before the stores are built.
 ///
-/// **Lifecycle.** A clean quit terminates the child. A hard kill (SIGKILL, crash)
-/// cannot be intercepted, so the next launch simply adopts the survivor — orphans
-/// cannot accumulate because there is only ever one port to bind.
+/// **No orphans.** The port can be occupied by something that is *not* the running
+/// app talking to a service — specifically, a copy of this same sidecar left
+/// behind by a crash, a Force Quit, or a `kill`. Such a process can never be
+/// reclaimed by the launch that finds it (there is no `Process` handle for it),
+/// and it would keep serving stale code after the app is updated. So `start()`
+/// identifies the listener and, when it is our own bundled sidecar, replaces it
+/// rather than adopting it. Anything else — a developer's `node app.js`, a sidecar
+/// the user points the app at — is adopted and left alone, because it is not ours
+/// to kill.
+///
+/// **Every exit path reaps the child**:
+/// - a Quit (⌘Q, Dock, logout, restart) fires `willTerminateNotification`;
+/// - `SIGTERM`/`SIGINT` are captured and turned into the same shutdown, because
+///   AppKit does not run its termination sequence for a raw signal;
+/// - a hard kill cannot be intercepted, which is exactly what the takeover logic
+///   above exists to clean up on the next launch.
 @MainActor
 final class SidecarController {
     private var process: Process?
     private var relaunchCount = 0
     private var isShuttingDown = false
     private var terminationObserver: NSObjectProtocol?
+    private var signalSources: [DispatchSourceSignal] = []
     private let probeSession: URLSession
 
     init() {
@@ -64,7 +77,22 @@ final class SidecarController {
     func start() async {
         guard isLocalEndpoint else { return }
         observeTermination()
-        guard !(await isListening()) else { return }
+        observeSignals()
+
+        if await isListening() {
+            let reclaimed = await reclaimLeakedSidecar()
+            // Not ours (a developer's `node app.js`, a user-supplied service):
+            // adopt it and leave it running when we quit.
+            guard !reclaimed.isEmpty else { return }
+            if !(await waitForPortToClose(attempts: 12)) {
+                // The sidecar has no signal handlers, so SIGTERM should always be
+                // enough — this is the belt-and-braces case for a wedged process
+                // holding the port.
+                for pid in reclaimed { kill(pid, SIGKILL) }
+                _ = await waitForPortToClose(attempts: 12)
+            }
+        }
+
         guard let binary = Bundle.main.url(forAuxiliaryExecutable: sidecarExecutableName) else { return }
         run(binary)
         await waitUntilListening()
@@ -114,6 +142,91 @@ final class SidecarController {
         run(binary)
     }
 
+    // MARK: - Leak reclamation
+
+    /// SIGTERMs any copy of our own bundled sidecar that is sitting on the port.
+    ///
+    /// Returns the pids it signalled so the caller can escalate, or an empty array
+    /// when the listener is something we must not touch.
+    private func reclaimLeakedSidecar() async -> [pid_t] {
+        var reclaimed: [pid_t] = []
+        for pid in await Self.listeningPIDs(on: port) {
+            guard let path = await Self.executablePath(of: pid),
+                  Self.isOwnBundledSidecar(at: path)
+            else { continue }
+            kill(pid, SIGTERM)
+            reclaimed.append(pid)
+        }
+        return reclaimed
+    }
+
+    /// Polls until nothing answers on the port. True when it closed.
+    private func waitForPortToClose(attempts: Int) async -> Bool {
+        for _ in 0..<attempts {
+            if !(await isListening()) { return true }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return false
+    }
+
+    /// PIDs listening on `port`.
+    ///
+    /// `-sTCP:LISTEN` matters: without it `lsof` also returns every process that
+    /// merely holds a client connection to the port.
+    private nonisolated static func listeningPIDs(on port: Int) async -> [pid_t] {
+        let output = await capture("/usr/sbin/lsof", ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-t"])
+        return output.split(whereSeparator: \.isNewline).compactMap { pid_t($0) }
+    }
+
+    /// Absolute path of the executable `pid` is running, or nil when it cannot be
+    /// read (another user's process).
+    ///
+    /// Two `lsof` calls, because `-i` and `-d` both select *files*: asking for them
+    /// together matches nothing, since a listening socket is not an executable.
+    /// `-Fn` prints one `n<name>` line per match and the executable comes first
+    /// (the dynamic linker follows it).
+    private nonisolated static func executablePath(of pid: pid_t) async -> String? {
+        let output = await capture("/usr/sbin/lsof", ["-p", String(pid), "-a", "-d", "txt", "-Fn"])
+        for line in output.split(whereSeparator: \.isNewline) where line.hasPrefix("n") {
+            return String(line.dropFirst())
+        }
+        return nil
+    }
+
+    /// True when `path` is the sidecar inside *this* app bundle. The name is
+    /// checked as well as the prefix, so an unrelated process that happens to sit
+    /// under the same directory is not mistaken for ours.
+    private nonisolated static func isOwnBundledSidecar(at path: String) -> Bool {
+        guard (path as NSString).lastPathComponent == sidecarExecutableName else { return false }
+        return path.hasPrefix(Bundle.main.bundleURL.path + "/")
+    }
+
+    /// Runs a short-lived helper and returns its standard output.
+    ///
+    /// Off the main actor because these block while the child runs, and `start()`
+    /// calls them on the launch path. `lsof` is used because it is the only tool
+    /// that maps a listening socket back to the process holding it.
+    private nonisolated static func capture(_ executable: String, _ arguments: [String]) async -> String {
+        await Task.detached(priority: .userInitiated) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: executable)
+            task.arguments = arguments
+            let output = Pipe()
+            task.standardOutput = output
+            task.standardError = Pipe()
+            do {
+                try task.run()
+            } catch {
+                return ""
+            }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            return String(decoding: data, as: UTF8.self)
+        }.value
+    }
+
+    // MARK: - Readiness probe
+
     /// Polls until the port answers. The child needs an unpredictable moment to
     /// bind, so this avoids guessing a fixed sleep.
     private func waitUntilListening() async {
@@ -140,7 +253,9 @@ final class SidecarController {
         }
     }
 
-    /// Terminates the child on a clean quit, which is the only exit we can see.
+    // MARK: - Termination
+
+    /// Terminates the child on a clean quit.
     private func observeTermination() {
         guard terminationObserver == nil else { return }
         terminationObserver = NotificationCenter.default.addObserver(
@@ -150,5 +265,38 @@ final class SidecarController {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.stop() }
         }
+    }
+
+    /// Turns `SIGTERM`/`SIGINT` into the same shutdown a Quit runs.
+    ///
+    /// AppKit only runs its termination sequence for a Quit Apple event, so a bare
+    /// `kill` would take the app down without ever reaching `stop()` and leave the
+    /// child holding the port. A dispatch source is used rather than `signal(2)`
+    /// because only the former may safely touch `Process` — the handler runs on
+    /// the main queue instead of in a signal context.
+    private func observeSignals() {
+        guard signalSources.isEmpty else { return }
+        for number in [SIGTERM, SIGINT] {
+            // Resume the signal first: the dispatch source observes delivery, and
+            // the default action (terminate here and now) must not also fire.
+            signal(number, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+            source.setEventHandler { [weak self] in
+                MainActor.assumeIsolated { self?.terminateForSignal() }
+            }
+            source.resume()
+            signalSources.append(source)
+        }
+    }
+
+    /// Reaps the child and exits.
+    ///
+    /// Deliberately not `NSApplication.terminate`, which runs the cancellable
+    /// normal-quit sequence — a signal must not be something the app can refuse.
+    /// `Process.terminate()` is enough to end the sidecar: its source registers no
+    /// signal handlers, so the default disposition applies.
+    private func terminateForSignal() {
+        stop()
+        exit(EXIT_SUCCESS)
     }
 }
