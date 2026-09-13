@@ -85,7 +85,7 @@ App 默认连接 `http://127.0.0.1:6521`，并且会**复用**已经在该端口
 
 需要登录酷狗账号（默认扫码，也支持手机验证码 / 密码）。本项目**没有游客模式**，未登录时所有页面都是登录入口。
 
-## 卸载
+## 卸载与清理
 
 ### Homebrew 安装的
 
@@ -95,16 +95,27 @@ brew uninstall --cask astramusic
 
 加 `--zap` 会连资料库、偏好等本地数据一起删除。
 
-### 其他情况，或想清得彻底
+### 用仓库里的脚本（更彻底）
 
-仓库里的 [`Script/Uninstall.sh`](Script/Uninstall.sh) 会把 AstraMusic 从这台 Mac 上彻底清掉 —— 应用本体、资料库、偏好、缓存、旧版本遗留的沙盒容器，以及钥匙串里的酷狗登录令牌，做到「像从没装过一样」。
+`Script/` 下有三个脚本，都不需要 sudo，执行前会先列出要删的内容，加 `--dry-run` 只预览。先 clone 一份即可，不用构建：
 
 ```bash
 git clone --depth 1 https://github.com/DabRlin/AstraMusic.git
-./AstraMusic/Script/Uninstall.sh
 ```
 
-脚本会先列出将删除的内容，确认后才执行；加 `--dry-run` 只预览不删。不需要 sudo。
+| 脚本 | 做什么 | 会丢失什么 |
+|---|---|---|
+| [`Script/Uninstall.sh`](Script/Uninstall.sh) | 彻底卸载：应用本体 + 全部数据 | 全部 —— 像从没装过 |
+| [`Script/clean_data_all.sh`](Script/clean_data_all.sh) | 清空数据，但保留 App | 喜欢 / 最近播放 / 本地歌单 / 偏好 / 登录态 |
+| [`Script/clean_cache.sh`](Script/clean_cache.sh) | 只清缓存 | 不丢任何东西，封面下次用时重新下载 |
+
+```bash
+./AstraMusic/Script/Uninstall.sh       # 连 App 一起删掉
+./AstraMusic/Script/clean_data_all.sh  # 保留 App：像刚装上、还没登录
+./AstraMusic/Script/clean_cache.sh     # 只清缓存：歌单、最近播放、登录态都留着
+```
+
+`Uninstall.sh` 与 `clean_data_all.sh` 都会删掉钥匙串里的酷狗登录令牌，之后需要重新登录（`clean_data_all.sh --keep-login` 可以保留登录）。`clean_cache.sh` 只删封面缓存和播放时落下的临时流媒体文件 —— 后者可能攒到几百 MB，是真正值得清的那份，且不影响你的资料库。
 
 ## 已知限制
 

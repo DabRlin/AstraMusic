@@ -12,21 +12,17 @@
 #   Script/Uninstall.sh --help
 #
 # 幂等：不存在的路径会被跳过，重复运行无副作用。不需要 sudo。
+#
+# 另外两个脚本：clean_data_all.sh（只清数据，保留应用）、clean_cache.sh（只清缓存）。
 
 set -u
 
-# ───────────────────────────── 常量 ─────────────────────────────
-BUNDLE_ID="com.dang.AstraMusic"
-APP_NAME="AstraMusic"
-SIDECAR_NAME="AstraMusicSidecar"
-# 与 Networking/SessionStore.swift 中的 service / tokenAccount 保持一致
-KEYCHAIN_SERVICE="com.dang.AstraMusic"
-KEYCHAIN_ACCOUNT="kugou.token"
-BREW_CASK="astramusic"
+# 共用定义（身份、落盘清单、say/run/confirm 等）都在 lib/common.sh，
+# 三个脚本共用一份，避免路径清单漂移。
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+. "${SCRIPT_DIR}/lib/common.sh"
 
 # ───────────────────────────── 参数 ─────────────────────────────
-DRY_RUN=0
-ASSUME_YES=0
 
 usage() {
   cat <<EOF
@@ -50,66 +46,6 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-
-# ──────────────────────────── 小工具 ────────────────────────────
-say()  { printf '%s\n' "$*"; }
-warn() { printf '  ! %s\n' "$*" >&2; }
-
-# 尊重 --dry-run 地执行一条命令
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    printf '    [dry-run] %s\n' "$*"
-  else
-    "$@"
-  fi
-}
-
-confirm() {
-  [ "$ASSUME_YES" -eq 1 ] && return 0
-  printf '%s [y/N] ' "$1"
-  read -r reply || return 1
-  case "$reply" in
-    [yY]|[yY][eE][sS]) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-# 删除一个存在的路径（文件 / 目录 / 符号链接）；不存在则静默跳过
-remove_path() {
-  local path="$1"
-  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
-    return 0
-  fi
-  say "  删除 $path"
-  if [ -L "$path" ] || [ ! -d "$path" ]; then
-    run rm -f -- "$path" || warn "无法删除: $path"
-  else
-    run rm -rf -- "$path" || warn "无法删除: $path（可能受系统保护，见文末说明）"
-  fi
-}
-
-# ─────────────────────────── 清理清单 ───────────────────────────
-HOME_DIR="${HOME:?HOME 未设置}"
-
-APP_PATHS=(
-  "/Applications/${APP_NAME}.app"
-  "${HOME_DIR}/Applications/${APP_NAME}.app"
-)
-
-DATA_PATHS=(
-  "${HOME_DIR}/Library/Application Support/${APP_NAME}"
-  "${HOME_DIR}/Library/Caches/${BUNDLE_ID}"
-  "${HOME_DIR}/Library/HTTPStorages/${BUNDLE_ID}"
-  "${HOME_DIR}/Library/WebKit/${BUNDLE_ID}"
-  "${HOME_DIR}/Library/Application Scripts/${BUNDLE_ID}"
-  "${HOME_DIR}/Library/Saved Application State/${BUNDLE_ID}.savedState"
-  "${HOME_DIR}/Library/Containers/${BUNDLE_ID}"   # 旧版本沙盒时代留下的
-  "${HOME_DIR}/Library/Logs/${APP_NAME}"
-)
-
-PREF_PATHS=(
-  "${HOME_DIR}/Library/Preferences/${BUNDLE_ID}.plist"
-)
 
 # ──────────────────────────── 开场 ────────────────────────────
 say "AstraMusic 完全卸载"
@@ -135,31 +71,7 @@ say ""
 
 # ───────────────────── 1. 退出运行中的进程 ─────────────────────
 say "[1/7] 退出正在运行的进程"
-FOUND_PROC=0
-for name in "$APP_NAME" "$SIDECAR_NAME"; do
-  if pgrep -x "$name" >/dev/null 2>&1; then
-    say "  结束 $name"
-    run pkill -x "$name" >/dev/null 2>&1 || true
-    FOUND_PROC=1
-  fi
-done
-if [ "$FOUND_PROC" -eq 0 ]; then
-  say "  没有运行中的进程"
-elif [ "$DRY_RUN" -eq 0 ]; then
-  # 给它几秒自己退出，还在就强制结束
-  for _ in 1 2 3 4 5; do
-    if ! pgrep -x "$APP_NAME" >/dev/null 2>&1 && ! pgrep -x "$SIDECAR_NAME" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
-  if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
-    run pkill -9 -x "$APP_NAME" >/dev/null 2>&1 || true
-  fi
-  if pgrep -x "$SIDECAR_NAME" >/dev/null 2>&1; then
-    run pkill -9 -x "$SIDECAR_NAME" >/dev/null 2>&1 || true
-  fi
-fi
+quit_app_processes
 
 # ───────────────────────── 2. Homebrew cask ─────────────────────────
 say "[2/7] 检查是否由 Homebrew 安装"
@@ -179,7 +91,7 @@ done
 
 # ───────────────────────── 4. 资料库与缓存 ─────────────────────────
 say "[4/7] 删除资料库与缓存"
-for path in "${DATA_PATHS[@]}"; do
+for path in "${CACHE_PATHS[@]}" "${STATE_PATHS[@]}"; do
   remove_path "$path"
 done
 
@@ -213,7 +125,6 @@ fi
 
 # ───────────────────── 7. 反注册 + 残留复查 ─────────────────────
 say "[7/7] 反注册并复查残留"
-LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 if [ -x "$LSREGISTER" ]; then
   for path in "${APP_PATHS[@]}"; do
     if [ -e "$path" ]; then
